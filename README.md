@@ -1,16 +1,60 @@
-[comment]:<1. Sätt upp en skalbar värdmiljö för en containerbaserad webbapplikation och beskriv steg för steg hur du går tillväga>
-[//]: <Använd AWS ECS när du implementerar lösningen.>
-[//]: <Beskriv vad de olika komponenterna i din lösning har för uppgift och syfte>
-[//]: <Redogör för vilka molntjänster du utnyttjat.>
-[//]: <Beskriv hur du använder IaC och automation - om du gör det.>
-[//]: <2. Sätt upp en CI/CD Pipeline för att driftsätta din applikation.>
-[//]: <Använd AWS när du implementerar lösningen.>
-[//]: <Beskriv vad de olika komponenterna i din pipeline har för uppgift och syfte>
-[//]: <Redogör för vilka molntjänster du utnyttjat.>
-[//]: <Gör en uppdatering av din applikation och verifiera att ändringen propagerar genom pipelinen och driftssätts automatiskt i värdmiljön.>
-Steg 
-1. Create a basic website file to run in the docker image.
-2. Create a docker image using Amazon Linux 2023, install NGINX on it and expose port 80.
+# AWS 2 - Skalbar Dockermiljö
+### Index
+1. [Inledning](#inledning)
+2. [Definitioner](#definitioner)
+2. [Krav](#krav)
+3. [Systemarkitektur - Översikt](#systemarkitektur---översikt)
+    - [Utnyttjade molntjänster](#utnyttjade-molntjänster)
+1. [Provisionering av driftmiljö och driftsättning av applikation](#provisionering-av-driftmiljö-och-driftsättning-av-applikation)
+1. [Slutsats](#slutsats)
+2. [Appendix](#appendix)
+3. [Referenser](#referenser)
+### Verktyg och tjänster
+- Obsidian
+- VSCode
+- GitHub
+- AWS + AWS CLI
+- Docker
+- ChatGPT
+## Inledning
+Målet med denna uppgiften är att lägga up en fungerande skalbar dockerapplikation och en CI/CD pipeline för att driftsätta den i Amazon Web Services.
+Under hela projektet försökte jag hålla mig till namnstrukturen <projektnamn><tjänsttyp> och om inte det var tillräckligt så la jag till mer beskrivande ord.
+## Definitioner
+- AWS = Amazon Web Services
+- CI/CD = Continious Integration / Continious Deployment
+- CLI = Command Line Interface
+- AWS tjänster:
+    - IAM = Identity and Access Management
+    - ECS = Elastic Container Service
+    - ECR = Elastic Container Registry
+    - SG = Security Group
+    - ALB = Application Load Balancer
+    - TG = Target Group
+## Krav
+- Kan skalas automatiskt via load balancer.
+- Applikationen ligger i en containerbaserad lösning som Docker.
+- CI/CD pipeline som kan uppdatera applikationen via git push till sin repository.
+- Använda så många Amazon Web Services som möjligt.
+## Systemarkitektur - Översikt
+Så när jag försökte få en översikt av alla delar så kändes det som att det såg ut ungefär såhär:
+![cicd-flowchart](./img/cicd-pipeline-flow)
+Där Pipeline uppdaterar ECR och skickar tillbaka den nya filen till docker och när man triggar ECR så uppdateras hela ECS strukturen.
+### Utnyttjade molntjänster
+- AWS: 
+    - ECR
+    - ECS
+    - Codebuild
+    - CodePipeline
+    - IAM
+    - Target Groups
+    - Security Groups
+- GitHub
+- ChatGPT
+## Provisionering av driftmiljö och driftsättning av applikation
+Jag testar här ett nytt format där jag går igenom och gör själva uppgiften och sen lägger in min förståelse i ett steg för steg format.
+
+1. Skapa en enkel hemsida som vi kan köra i Docker containern.
+2. Initiera en docker container med Amazon Linux 2023, installera NGINX på den och öppna port 80 för webbtrafik.
 ```docker
 FROM amazonlinux:2023
 
@@ -22,7 +66,7 @@ EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
 ```
-3. Create github repo on githubs website and initialize git repo and upload it to github.
+3. Skapa en GitHub repository på deras hemsida och intitiera en git repository på datorn som du sen gör en commit och laddar upp till github.
 ```bash
 git init
 git add .
@@ -31,13 +75,13 @@ git branch -M main
 git remote add origin git@github.com:<git user>/<repo name>.git
 git push origin main
 ```
-4. Create an ECR using this command and take note of the underlined information:
+4. Skapa en ECR med detta kommandot och skriv ner informationen som är understruken:
 ```bash
-aws ecr create-repository --repository-name aws2-docker
+aws ecr create-repository --repository-name <projekt-namn>
 ```
 ![ECR Creation Data](./img/amazon-ecr-repository)
 
-5. It's time to use the information you have noted down before into this buildspec file for our code pipeline
+5. Nu använder vi den informationen för att göra våran buildspec.yml som kommer hantera ordningen saker händer när vi lägger in Build och pipeline stegen.
 ```yml
 version: 0.2
 
@@ -46,14 +90,15 @@ phases:
     commands:
       # Fill in ECR information
       - REGISTRY_URI=767397794379.dkr.ecr.eu-west-1.amazonaws.com # Registry URI
-      - IMAGE_NAME=aws2-docker # Repository Name
-      - REGION=eu-west-1 # Region taken from either Repository Arn or Repository Uri.
+      - IMAGE_NAME=aws2-docker # Repository namnet
+      - REGION=eu-west-1 # Hitta regionen från bildreferensen.
       # Fill in ECS information
-      - CONTAINER_NAME=AWS2_DockerContainer # This will be the name you should use for your task definition container name.
+      # Detta kommer bli namnet du använder i din Task definition Container så spara detta.
+      - CONTAINER_NAME=AWS2-DockerContainer 
       # -----------------------
       - IMAGE=$REGISTRY_URI/$IMAGE_NAME
       - COMMIT=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-8)
-      # Log in to docker
+      # Vi har en inlogg till docker här för annars kanske man inte kan ladda ner amazon operativsystemfilen.
       - echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
       - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $REGISTRY_URI
   build:
@@ -71,87 +116,63 @@ artifacts:
     # Put imagedefinitions.json in the artifact zip file
     - imagedefinitions.json
 ```
-5. Create a Build Project
-    - Click on create project.
+5. Skapa ett CodeBuild projekt
+    - Klicka på create project.
     - Source
-        - Source should be Github
-        - Connect github by clicking Manage default source credential, it will open a new Tab. 
-        - Use the Github App and click the linked text saying "create a new GitHub connection".
-        - A new window will pop up where you log into github, when it is created you press select it in the dropdown and press save.
-        - Clck the Repository and it should pop up with a list of repositories on your account.
-        - Select the repo for this project. Under Source version make sure to select or type the branch you'll be using.
-    - Use a Webhook
+        - Source borde vara GitHub
+        - Anslut till GitHub genom att clicka på "Manage default source credential", Detta kommer öppna en ny flik. 
+        - Använd Github App och klicka på texten med länk som säger "create a new GitHub connection".
+        - Ett nytt fönster kommer öppnas där du kan logga in till GitHub. När du har skapat den så väljer du den i dropdown och trycker "Save".
+        - Klicka på sökrutan udner "Repository" så borde du få en lista av dina repositories som finns på ditt konto. Antingen sök eller scrolla igenom listan för att välja rätt repository för ditt projekt.
+        - Under "Source version" se till att du väljer eller skriver branchen som du ska använda.
+    - Använd en Webhook
     - Environment 
-        - Operating system to Ubuntu
+        - Operating system ska vara Ubuntu
         - Runtime to Standard
         - Image to aws/codebuild/standard:7.0
-        - Under Additional configuration you need to check the box under Privileged and
-        - Add two environment variables, Your docker username and your docker password as DOCKERHUB_USERNAME and DOCKERHUB_PASSWORD respectively. The username is case sensitive and **HAS** to be lowercase.
-    - Create a new service role and note the name.
-    - Under the Buildspec section you need to change to using a buildspec file.
-    - Create project.
+        - Under **Additional configuration** så behöver du klicka i rutan för "Privileged" och lägga till två **Environment variables**. **DOCKERHUB_USERNAME** och **DOCKERHUB_PASSWORD**. Användarnamnet är Case Sensitive och **MÅSTE** vara små bokstäver för att kunna logga in.
+    - Skapa en ny Service roll och notera namnet.
+    - Under Buildspec sektionen behöver du ändra till att använda en fil istället för kommandorutan.
+    - Klicka Create project.
 
-    - To finish off this you need to go to IAM, Roles, Click the newly made service role and add the managed policy AmazonEC2ContainerRegistryPowerUser to it.
-    - Start build
-- Verify that the image shows up under ECR's 
-6. Create Elastic container service with a task definition, cluster and service.
+    - För att avsluta denna sektionen behöver du gå till IAM, Roles, Klicka på service rollen du nyss skapat och lägga till policyn **AmazonEC2ContainerRegistryPowerUser** till den.
+    - Starta Builden.
+- Dubbelkolla att container imagen nu finns som en ECR. 
+6. Skapa Elastic container service med en task definition, cluster och service.
     1. ECS Task
-        - Use AWS fargate for the task definition
-        - Use the same Container definition name from the buildspec.
-        - When adding the container definition name you will need the <Repository URI>/<Image name> from the previous image.
-        - Press Create
+        - Använd AWS fargate för task definitionen
+        - Använd samma namn under Container details -> Name som CONTAINER_NAME i din buildspec.
+        - När du lägger till Container details Image URI så behöver du <Repository URI>/<Image name> från den tidigare bilden i det formatet.
+        - Klicka Create
     2. ECS Cluster
-        - Cluster name and create it.
+        - Cluster namn och skapa det.
     3. ECS Service
-        - Create a service in your cluster.
-        - Family name has to be entered but ultimately doesn't matter.
-        - Service name
-        - Set Desired Tasks to more than 1.
-        - Expand networking and use or create a new security group that's open to HTTP.
-        - Open up the section for Load Balancing, Select an Application Load Balancer and name it.
-        - Create the service.
-7. After a few minutes go into your ECS cluster, Click the service and check the tasks tab, in here you click the task name and you'll be able to find the IP for your docker container. Verify it is up and working by clicking the IP. Then go to EC2 -> Load Balancer -> Copy the DNS name of your load balancer and open a new tab to verify the load balancer works.
-8. Create a CodePipeline
-    - Choose a Build a custom pipeline then next.
-    - Name it as usual and click next.
+        - Skapa en service i ditt Cluster
+        - Family namnet behöver du fylla i men gär ingen skillnad, jag tog projektets namn.
+        - Service namn
+        - Sätt Desired Tasks till mer än 1.
+        - Öppna networking delen och använd eller skapa en ny SG som är öppen till HTTP.
+        - Öppna upp delen för Load Balancing, Välj ALB och ge den ett namn.
+        - Skapa Service.
+7. Efter ett par minuter gå in i ditt ECS Cluster, Klicka på Service och kolla i tasks fliken. Där klickar du på task namnet så kommer du kunna hitta IP'n för din docker container. Verifiera så att när du klickar på IP'n kommer du till sidan du skapade innan. Sen går vi till EC2 -> Load Balancer -> Kopiera DNS namnet av din load balancer och öppna en ny flik för att gå till den sidan för att verifiera att Load balancern också fungerar.
+8. Skapa en CodePipeline
+    - Välj Build a custom pipeline sen Next.
+    - Namnge den som vanligt och klicka Next.
     - Source
         - Github Version 1
-        - Connect to github, should be 2 clicks.
-        - Choose the repository for your project and the branch then click next.
+        - Anslut till github, Borde vara två klick.
+        - Välj Repositoryn för ditt projekt och branchen, Sen klicka Next.
     - Build
-        - Choose Other Build providers and Select AWS Codebuild fromthe dropdown.
-        - Choose the Codebuild project we made earlier.
-        - Click next.
-    - Deploy Provider should be Amazon ECS.
-    - Cluster and Service name should be the projects names.
-9. f
-10. u
-
-Try to keep to a naming scheme like <project-name><service-type> and descriptive.
-# AWS 2 - Skalbar Dockermiljö
-### Index
-1. [Inledning](#inledning)
-2. [Krav](#krav)
-3. [Systemarkitektur - Översikt](#systemarkitektur---översikt)
-    - [Komponenter](#komponenter)
-    - [Utnyttjade molntjänster](#utnyttjade-molntjänster)
-1. [Provisionering av driftmiljö och driftsättning av applikation](#provisionering-av-driftmiljö-och-driftsättning-av-applikation)
-1. [Slutsats](#slutsats)
-2. [Appendix](#appendix)
-3. [Referenser](#referenser)
-### Verktyg och tjänster
-- Obsidian
-- VSCode
-- GitHub
-- AWS + AWS CLI
-- Docker
-## Inledning
-Målet med denna uppgiften 
-## Krav
-## Systemarkitektur - Översikt
-### Komponenter
-### Utnyttjade molntjänster
-## Provisionering av driftmiljö och driftsättning av applikation
+        - Välj Other Build providers och välj AWS Codebuild från dropdownen.
+        - Välj Codebuild projektet vi gjorde tidigare.
+        - Klicka next.
+    - Deploy Provider borde vara Amazon ECS.
+    - Cluster och Service name ska vara samma som dem du skapade tidigare i projektet.
+    - Skapa pipelinen.
+9. När Pipelinen blir klar, ändra något i din hemsida och skicka upp ändringen till GitHub, Vänta tills den blir klar igen och kolla på din ALB länk från tidigare för att verifiera att ändringar går igenom.
 ## Slutsats
-## Appendix
-## Referenser
+Ärligt talat, Dessa instruktioner visar inte mycket av problemen jag hade med detta projektet. Det finna många smådelar som enkelt missas. På hela alltet så är det trevligt att kunna få upp en CI/CD pipeline och se allting fungera. 
+
+Oturligt nog för mig så försvann Amazon CodeCommit innan jag gjorde detta projektet och jag var tvungen att gå runt det och testa flera olika lösningar som använde GitHub i större kapacitet än jag hade tänkt mig.
+
+Kollade även lite dokumentation för att se ifall det fanns någon möjlighet att göra en mer IaC struktur på det hela men gav upp på det för AWS dokumentationen kändes sämre än Azure/Google's dokumentation för samma saker.
