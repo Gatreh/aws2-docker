@@ -8,7 +8,7 @@ phases:
       - IMAGE_NAME=aws2-docker # Repository Name
       - REGION=eu-west-1 # Region taken from either Repository Arn or Repository Uri.
       # Fill in ECS information
-      - CONTAINER_NAME=AWS2_DockerContainer # Task Definition container name
+      - CONTAINER_NAME=AWS2-DockerContainer # Task Definition container name
       # -----------------------
       - IMAGE=$REGISTRY_URI/$IMAGE_NAME
       - COMMIT=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-8)

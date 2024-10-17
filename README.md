@@ -37,43 +37,7 @@ aws ecr create-repository --repository-name aws2-docker
 ```
 ![ECR Creation Data](./img/amazon-ecr-repository)
 
-5. Create a Build Project
-    - Click on create project.
-    - Source should be Github
-    - Connect github by clicking Manage default source credential, it will open a new Tab. Use the Github App and click the linked text saying "create a new GitHub connection". A new window will pop up where you log into github, when it is created you press select it in the dropdown and press save.
-    - Clck the Repository and it should pop up with a list of repositories on your account, Select the repo for this project. Under Source version make sure to select the branch you'll be using.
-    - Use a Webhook
-    - Environment 
-        - Operating system to Ubuntu
-        - Runtime to Standard
-        - Image to aws/codebuild/standard:7.0
-        - Under Additional configuration you need to check the box under Privileged and
-        - Add two environment variables, Your docker username and your docker password as DOCKERHUB_USERNAME and DOCKERHUB_PASSWORD respectively. The username is case sensitive and **HAS** to be lowercase.
-    - Create a new service role and note the name.
-    - Under the Buildspec section you need to change to using a buildspec file.
-    - Create project.
-
-    - To finish off this you need to go to IAM, Roles, Click the newly made service role and add the managed policy AmazonEC2ContainerRegistryPowerUser to it.
-    - Start build
-5. Create Elastic container service with a task definition, cluster and service.
-    1. ECS Task
-        - Use AWS fargate for the task definition
-        - Note down the Container definition name. It will be used later.
-        - When adding the container definition name you will need the Repository URI from the previous image.
-        - Press Create
-    2. ECS Cluster
-        - Cluster name and create it.
-    3. ECS Service
-        - Create a service in your cluster.
-        - Family name has to be entered but ultimately doesn't matter.
-        - Service name
-        - Set Desired Tasks to more than 1.
-        - Expand networking and use or create a new security group that's open to HTTP.
-        - Open up the section for Load Balancing, Select an Application Load Balancer and name it.
-        - Create the service.
-6. After a few minutes go into your ECS cluster, Click the service and check the tasks tab, in here you click the task name and you'll be able to find the IP for your docker container. Verify it is up and working by clicking the IP.
-
-7. It's time to use the information you have noted down before into this buildspec file for our code pipeline
+5. It's time to use the information you have noted down before into this buildspec file for our code pipeline
 ```yml
 version: 0.2
 
@@ -85,7 +49,7 @@ phases:
       - IMAGE_NAME=aws2-docker # Repository Name
       - REGION=eu-west-1 # Region taken from either Repository Arn or Repository Uri.
       # Fill in ECS information
-      - CONTAINER_NAME=AWS2_DockerContainer # Task Definition container name
+      - CONTAINER_NAME=AWS2_DockerContainer # This will be the name you should use for your task definition container name.
       # -----------------------
       - IMAGE=$REGISTRY_URI/$IMAGE_NAME
       - COMMIT=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-8)
@@ -107,9 +71,61 @@ artifacts:
     # Put imagedefinitions.json in the artifact zip file
     - imagedefinitions.json
 ```
-6. df
-7. f
-8. u
+5. Create a Build Project
+    - Click on create project.
+    - Source
+        - Source should be Github
+        - Connect github by clicking Manage default source credential, it will open a new Tab. 
+        - Use the Github App and click the linked text saying "create a new GitHub connection".
+        - A new window will pop up where you log into github, when it is created you press select it in the dropdown and press save.
+        - Clck the Repository and it should pop up with a list of repositories on your account.
+        - Select the repo for this project. Under Source version make sure to select or type the branch you'll be using.
+    - Use a Webhook
+    - Environment 
+        - Operating system to Ubuntu
+        - Runtime to Standard
+        - Image to aws/codebuild/standard:7.0
+        - Under Additional configuration you need to check the box under Privileged and
+        - Add two environment variables, Your docker username and your docker password as DOCKERHUB_USERNAME and DOCKERHUB_PASSWORD respectively. The username is case sensitive and **HAS** to be lowercase.
+    - Create a new service role and note the name.
+    - Under the Buildspec section you need to change to using a buildspec file.
+    - Create project.
+
+    - To finish off this you need to go to IAM, Roles, Click the newly made service role and add the managed policy AmazonEC2ContainerRegistryPowerUser to it.
+    - Start build
+- Verify that the image shows up under ECR's 
+6. Create Elastic container service with a task definition, cluster and service.
+    1. ECS Task
+        - Use AWS fargate for the task definition
+        - Use the same Container definition name from the buildspec.
+        - When adding the container definition name you will need the <Repository URI>/<Image name> from the previous image.
+        - Press Create
+    2. ECS Cluster
+        - Cluster name and create it.
+    3. ECS Service
+        - Create a service in your cluster.
+        - Family name has to be entered but ultimately doesn't matter.
+        - Service name
+        - Set Desired Tasks to more than 1.
+        - Expand networking and use or create a new security group that's open to HTTP.
+        - Open up the section for Load Balancing, Select an Application Load Balancer and name it.
+        - Create the service.
+7. After a few minutes go into your ECS cluster, Click the service and check the tasks tab, in here you click the task name and you'll be able to find the IP for your docker container. Verify it is up and working by clicking the IP. Then go to EC2 -> Load Balancer -> Copy the DNS name of your load balancer and open a new tab to verify the load balancer works.
+8. Create a CodePipeline
+    - Choose a Build a custom pipeline then next.
+    - Name it as usual and click next.
+    - Source
+        - Github Version 1
+        - Connect to github, should be 2 clicks.
+        - Choose the repository for your project and the branch then click next.
+    - Build
+        - Choose Other Build providers and Select AWS Codebuild fromthe dropdown.
+        - Choose the Codebuild project we made earlier.
+        - Click next.
+    - Deploy Provider should be Amazon ECS.
+    - Cluster and Service name should be the projects names.
+9. f
+10. u
 
 Try to keep to a naming scheme like <project-name><service-type> and descriptive.
 # AWS 2 - Skalbar Dockermiljö
@@ -126,7 +142,9 @@ Try to keep to a naming scheme like <project-name><service-type> and descriptive
 ### Verktyg och tjänster
 - Obsidian
 - VSCode
+- GitHub
 - AWS + AWS CLI
+- Docker
 ## Inledning
 Målet med denna uppgiften 
 ## Krav
