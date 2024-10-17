@@ -22,12 +22,53 @@ EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
 ```
-3. Initialize git repo and upload it to github.
-4. d
-5. 6
-6. df
-7. f
-8. u
+3. Create github repo on githubs website and initialize git repo and upload it to github.
+```bash
+git init
+git add .
+git commit -m "first commit"
+git branch -M main
+git remote add origin git@github.com:<git user>/<repo name>.git
+git push origin main
+```
+4. Create an ECR using this command and take note of the underlined information:
+```bash
+aws ecr create-repository --repository-name aws2-docker
+```
+![ECR Creation Data](./img/amazon-ecr-repository)
+
+5. Create a Build Project
+    - Click on create project.
+    - Source should be Github
+    - Connect github by clicking Manage default source credential, it will open a new Tab. Use the Github App and click the linked text saying "create a new GitHub connection". A new window will pop up where you log into github, when it is created you press select it in the dropdown and press save.
+    - Clck the Repository and it should pop up with a list of repositories on your account, Select the repo for this project. Under Source version make sure to select the branch you'll be using.
+    - Use a Webhook
+    - Under Environment you need to change the Operating system to Ubuntu, Runtime to Standard, Image to aws/codebuild/standard:7.0. Then under Additional configuration you need to check the box under Privileged.
+    - Create a new service role and note the name.
+    - Under the Buildspec section you need to change to using a buildspec file.
+    - Create project.
+
+    - To finish off this you need to go to IAM, Roles, Click the newly made service role and add the managed policy AmazonEC2ContainerRegistryPowerUser to it.
+    - Start build
+5. Create Elastic container service with a task definition, cluster and service.
+    1. ECS Task
+        - Use AWS fargate for the task definition
+        - Note down the Container definition name. It will be used later.
+        - When adding the container definition name you will need the Repository URI from the previous image.
+        - Add two environment variables, Your docker username and your docker password as DOCKERHUB_USERNAME and DOCKERHUB_PASSWORD respectively. The username is case sensitive.
+        - Press Create
+    2. ECS Cluster
+        - Cluster name and create it.
+    3. ECS Service
+        - Create a service in your cluster.
+        - Family name has to be entered but ultimately doesn't matter.
+        - Service name
+        - Set Desired Tasks to more than 1.
+        - Open up the section for Load Balancing, Select an Application Load Balancer and name it.
+        - Create the service.
+6. After a few minutes go into your ECS cluster, Click the service and check the tasks tab, in here you click the task name and you'll be able to find the IP for your docker container. Verify it is up and working by clicking the IP.
+
+7. It's time to use the information you have noted down before into this buildspec file for our code pipeline
 ```yml
 version: 0.2
 
@@ -35,17 +76,17 @@ phases:
   pre_build:
     commands:
       # Fill in ECR information
-      - REGISTRY_URI=<uri>
-      - IMAGE_NAME=<image-name>
-      - REGION=eu-west-1
+      - REGISTRY_ID=767397794379 # Registry ID
+      - IMAGE_NAME=aws2-docker # Repository Name
+      - REGION=eu-west-1 # Region taken from either Repository Arn or Repository Uri.
       # Fill in ECS information
-      - CONTAINER_NAME=<container-name> # Not same as Image name, gets confusing.
+      - CONTAINER_NAME=AWS2_DockerContainer # Task Definition container name
       # -----------------------
-      - IMAGE=$REGISTRY_URI/$IMAGE_NAME
+      - IMAGE=$REGISTRY_ID/$IMAGE_NAME
       - COMMIT=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-8)
       # Log in to docker
       - echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
-      - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $REGISTRY_URI
+      - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $REGISTRY_ID
   build:
     commands:
       - docker build --tag $IMAGE .
@@ -61,6 +102,11 @@ artifacts:
     # Put imagedefinitions.json in the artifact zip file
     - imagedefinitions.json
 ```
+6. df
+7. f
+8. u
+
+Try to keep to a naming scheme like <project-name><service-type> and descriptive.
 # AWS 2 - Skalbar Dockermiljö
 ### Index
 1. [Inledning](#inledning)
