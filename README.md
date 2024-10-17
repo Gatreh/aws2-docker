@@ -43,7 +43,12 @@ aws ecr create-repository --repository-name aws2-docker
     - Connect github by clicking Manage default source credential, it will open a new Tab. Use the Github App and click the linked text saying "create a new GitHub connection". A new window will pop up where you log into github, when it is created you press select it in the dropdown and press save.
     - Clck the Repository and it should pop up with a list of repositories on your account, Select the repo for this project. Under Source version make sure to select the branch you'll be using.
     - Use a Webhook
-    - Under Environment you need to change the Operating system to Ubuntu, Runtime to Standard, Image to aws/codebuild/standard:7.0. Then under Additional configuration you need to check the box under Privileged.
+    - Environment 
+        - Operating system to Ubuntu
+        - Runtime to Standard
+        - Image to aws/codebuild/standard:7.0
+        - Under Additional configuration you need to check the box under Privileged and
+        - Add two environment variables, Your docker username and your docker password as DOCKERHUB_USERNAME and DOCKERHUB_PASSWORD respectively. The username is case sensitive and **HAS** to be lowercase.
     - Create a new service role and note the name.
     - Under the Buildspec section you need to change to using a buildspec file.
     - Create project.
@@ -55,7 +60,6 @@ aws ecr create-repository --repository-name aws2-docker
         - Use AWS fargate for the task definition
         - Note down the Container definition name. It will be used later.
         - When adding the container definition name you will need the Repository URI from the previous image.
-        - Add two environment variables, Your docker username and your docker password as DOCKERHUB_USERNAME and DOCKERHUB_PASSWORD respectively. The username is case sensitive.
         - Press Create
     2. ECS Cluster
         - Cluster name and create it.
@@ -64,6 +68,7 @@ aws ecr create-repository --repository-name aws2-docker
         - Family name has to be entered but ultimately doesn't matter.
         - Service name
         - Set Desired Tasks to more than 1.
+        - Expand networking and use or create a new security group that's open to HTTP.
         - Open up the section for Load Balancing, Select an Application Load Balancer and name it.
         - Create the service.
 6. After a few minutes go into your ECS cluster, Click the service and check the tasks tab, in here you click the task name and you'll be able to find the IP for your docker container. Verify it is up and working by clicking the IP.
@@ -76,17 +81,17 @@ phases:
   pre_build:
     commands:
       # Fill in ECR information
-      - REGISTRY_ID=767397794379 # Registry ID
+      - REGISTRY_URI=767397794379.dkr.ecr.eu-west-1.amazonaws.com/aws2-docker # Registry URI
       - IMAGE_NAME=aws2-docker # Repository Name
       - REGION=eu-west-1 # Region taken from either Repository Arn or Repository Uri.
       # Fill in ECS information
       - CONTAINER_NAME=AWS2_DockerContainer # Task Definition container name
       # -----------------------
-      - IMAGE=$REGISTRY_ID/$IMAGE_NAME
+      - IMAGE=$REGISTRY_URI/$IMAGE_NAME
       - COMMIT=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-8)
       # Log in to docker
       - echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
-      - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $REGISTRY_ID
+      - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $REGISTRY_URI
   build:
     commands:
       - docker build --tag $IMAGE .
